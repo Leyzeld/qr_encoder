@@ -106,25 +106,54 @@ def decode_qif_to_archive(input_gif: str, output_archive: str):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Encode or decode QIF based on input file extension.")
-    parser.add_argument("-in", dest="input_file", required=True, help="Input file (.zip for encode, .gif for decode)")
-    parser.add_argument("-out", dest="output_file", required=True, help="Output file (.gif for encode, .zip for decode)")
+    parser = argparse.ArgumentParser(description='Encode or decode QIF based on input file extension.')
+    parser.add_argument('-in', dest='input_file', help='Input file (.zip for encode, .gif for decode)')
+    parser.add_argument('-out', dest='output_file', help='Output file (.gif for encode, .zip for decode)')
     args = parser.parse_args()
+
+    # --- DRAG & DROP MODE ---
+    if args.input_file is None:
+        print('Drag and drop. Then press Enter:')
+        drag_input = input().strip().strip('"')
+
+        if not drag_input:
+            print('File missing.')
+            return
+
+        input_path = Path(drag_input)
+
+        if not input_path.exists():
+            print('File not found:', input_path)
+            return
+
+        if input_path.suffix.lower() == '.zip':
+            output_path = input_path.with_suffix('.gif')
+            print(f'ENCODE. Output file: {output_path}')
+            encode_archive_to_qif(str(input_path), str(output_path))
+
+        elif input_path.suffix.lower() == '.gif':
+            output_path = input_path.with_suffix('.zip')
+            print(f'DECODE. Output file: {output_path}')
+            decode_qif_to_archive(str(input_path), str(output_path))
+
+        else:
+            print('Unknown format. Use .zip or .gif only')
+        return
 
     input_path = Path(args.input_file)
     output_path = Path(args.output_file)
 
-    if input_path.suffix.lower() == ".zip":
-        print("Mode: ENCODE (zip → gif)")
+    if input_path.suffix.lower() == '.zip':
+        print('Mode: ENCODE (zip → gif)')
         encode_archive_to_qif(str(input_path), str(output_path))
 
-    elif input_path.suffix.lower() == ".gif":
-        print("Mode: DECODE (gif → zip)")
+    elif input_path.suffix.lower() == '.gif':
+        print('Mode: DECODE (gif → zip)')
         decode_qif_to_archive(str(input_path), str(output_path))
 
     else:
-        raise ValueError("Unknown input format. Use .zip for encoding or .gif for decoding.")
+        raise ValueError('Unknown input format. Use .zip for encoding or .gif for decoding.')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
