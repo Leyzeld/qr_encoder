@@ -2,7 +2,6 @@ import qrcode
 import argparse
 from pathlib import Path
 from PIL import Image
-from pyzbar.pyzbar import decode
 from qreader import QReader
 import numpy as np
 
