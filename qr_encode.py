@@ -4,6 +4,13 @@ from pathlib import Path
 from PIL import Image
 from qreader import QReader
 import numpy as np
+import sys
+import os
+
+def resource_path(relative):
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, relative)
+    return os.path.join(os.path.dirname(__file__), relative)
 
 
 CHUNK_SIZE = 482
@@ -72,7 +79,8 @@ def parse_payload_hex(payload_hex: str):
 
 def decode_qif_to_archive(input_gif: str, output_archive: str):
     gif = Image.open(input_gif)
-    qreader = QReader(model_size='s', weights_folder='model')
+    model_path = resource_path("model")
+    qreader = QReader(model_size='s', weights_folder=model_path)
     chunks = {}
     total_chunks = None
     frame_index = 0
