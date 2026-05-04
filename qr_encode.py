@@ -6,6 +6,8 @@ from qreader import QReader
 import numpy as np
 import sys
 import os
+import cv2
+
 
 def resource_path(relative):
     if hasattr(sys, "_MEIPASS"):
@@ -100,7 +102,7 @@ def decode_qif_to_archive(input_gif: str, output_archive: str):
             frame_index += 1
         else:
             frame_index += 1
-        print(f'\r{len(chunks)}/{total_chunks}', end='', flush=True)
+        print(f'\r{len(chunks)}/{total_chunks} qrs', end='', flush=True)
         if len(chunks) == total_chunks:
             break
     print('\n')
@@ -112,13 +114,57 @@ def decode_qif_to_archive(input_gif: str, output_archive: str):
     print(f'Restored Archive : {output_archive}')
 
 
+def decode_mp4_to_archive(input_mp4: str, output_archive: str):
+    cap = cv2.VideoCapture(input_mp4)
+    if not cap.isOpened():
+        raise RuntimeError("Cannot open video file")
+
+    model_path = resource_path("model")
+    qreader = QReader(model_size='s', weights_folder=model_path)
+
+    chunks = {}
+    total_chunks = None
+
+    while True:
+        if total_chunks is not None and len(chunks) == total_chunks:
+            break
+        _, frame = cap.read()
+        current = cap.get(cv2.CAP_PROP_POS_FRAMES)
+        total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        if current >= total_frames:
+            break
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        img = np.array(gray)
+
+        payload_hex = decode_qr_hex(img, qreader)
+        if payload_hex:
+            idx, total, data = parse_payload_hex(payload_hex)
+            if total_chunks is None:
+                total_chunks = total
+            chunks[idx] = data
+        print(f"{len(chunks)}/{total_chunks} qrs")
+        print(f"{current}/{total_frames} video frame")
+
+        print("\033[2A", end="")
+
+
+    cap.release()
+    print("\n")
+
+    if len(chunks) != total_chunks:
+        raise RuntimeError(f'Expected {total_chunks} chunks, received {len(chunks)}')
+
+    result = b''.join(chunks[i] for i in range(total_chunks))
+    Path(output_archive).write_bytes(result)
+    print(f'Restored Archive : {output_archive}')
+
+
 def main():
     parser = argparse.ArgumentParser(description='Encode or decode QIF based on input file extension.')
-    parser.add_argument('-in', dest='input_file', help='Input file (.zip for encode, .gif for decode)')
-    parser.add_argument('-out', dest='output_file', help='Output file (.gif for encode, .zip for decode)')
+    parser.add_argument('-in', dest='input_file', help='Input file (.zip for encode, .gif/.mp4 for decode)')
+    parser.add_argument('-out', dest='output_file', help='Output file (.gif/.mp4 for encode, .zip for decode)')
     args = parser.parse_args()
 
-    # --- DRAG & DROP MODE ---
     if args.input_file is None:
         print('Drag and drop. Then press Enter:')
         drag_input = input().strip().strip('"')
@@ -143,8 +189,14 @@ def main():
             print(f'DECODE. Output file: {output_path}')
             decode_qif_to_archive(str(input_path), str(output_path))
 
+        elif input_path.suffix.lower() == '.mp4':
+            output_path = input_path.with_suffix('.zip')
+            print(f'DECODE. Output file: {output_path}')
+            decode_mp4_to_archive(str(input_path), str(output_path))
+
         else:
-            print('Unknown format. Use .zip or .gif only')
+            print('Unknown format. Use .zip or .gif/.mp4 only')
+
         return
 
     input_path = Path(args.input_file)
@@ -157,9 +209,11 @@ def main():
     elif input_path.suffix.lower() == '.gif':
         print('Mode: DECODE (gif → zip)')
         decode_qif_to_archive(str(input_path), str(output_path))
-
+    elif input_path.suffix.lower() == '.mp4':
+        print('Mode: DECODE (mp4 → zip)')
+        decode_qif_to_archive(str(input_path), str(output_path))
     else:
-        raise ValueError('Unknown input format. Use .zip for encoding or .gif for decoding.')
+        raise ValueError('Unknown input format. Use .zip for encoding or .gif/.mp4 for decoding.')
 
 
 if __name__ == '__main__':
